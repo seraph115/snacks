@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# Global Parameters
+connect_timeout=5
+current_user=$(whoami)
+
+# Input Parameters
+origin_file=$1
+target_file=$2
+
+export LC_ALL=C
+
+print_host() {
+	echo -e "\033[0;3;35m -> \033[0;3;35m$host \033[0m"
+}
+
+trans_file() {
+  print_host $host
+  cmd="scp"
+  if [ ! -z $port ]; then
+  	cmd="${cmd} -P ${port}"
+  fi
+  cmd="${cmd} -o ConnectTimeout=${connect_timeout} $(realpath $origin_file) ${user}@${host}:$target_file"
+  $cmd
+}
+
+trans_folder() {
+  print_host $host
+  cmd="scp"
+  if [ ! -z $port ]; then
+  	cmd="${cmd} -P ${port}"
+  fi
+  cmd="${cmd} -r -o ConnectTimeout=${connect_timeout} $(realpath $origin_file) ${user}@${host}:$target_file"
+  $cmd
+}
+
+execute_cmd() {
+  print_host $host
+  cmd="ssh"
+  if [ ! -z $port ]; then
+  	cmd="${cmd} -p ${port}"
+  fi
+  cmd="${cmd} ${user}@${host} $origin_file"
+  $cmd
+}
+
+iterate_cmd() {
+  for host_union in $(<hosts.conf); do
+  	# Split hosts.conf 
+  	IFS=':' read -a host_array <<< "$host_union"
+  	user=${host_array[0]}
+	host=${host_array[1]}
+	port=${host_array[2]}
+
+    $1 $user $host $port
+  done
+}
+
+# Check if 'hosts.conf' config file exist
+if [ ! -f hosts.conf ]; then
+  echo "sscp: sscp's config file 'hosts.conf' not exist in current path!"
+  exit
+fi
+
+# Execute 'sscp' command by the number of arguments
+if [ "$#" = 1 ]; then
+	iterate_cmd execute_cmd
+elif [ "$#" = 2 ]; then
+	if [ -d $origin_file ]; then
+      #trans_folder
+      iterate_cmd trans_folder
+    elif [ -f $origin_file ]; then
+      #trans_file
+      iterate_cmd trans_file
+    else
+      echo "sscp: error '$origin_file', file or folder is not exist."
+      exit
+    fi
+else
+	echo "sscp: try 'sscp --help' or 'sscp --manual' for more information"
+	exit
+fi
+
