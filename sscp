@@ -15,12 +15,16 @@ print_host() {
 }
 
 auto_passwd_cmd() {
+  set timeout -1
   expect -c "
     spawn $cmd
       expect {
         \"*yes/no*\" {send \"yes\r\"; exp_continue}
         \"*password:*\" {send \"$pass\r\"; exp_continue}
       }
+      expect 100%
+      expect eof
+      interact
   "
 }
 
@@ -53,8 +57,8 @@ execute_cmd() {
   if [ ! -z $port ]; then
   	cmd="${cmd} -p ${port}"
   fi
-  cmd="${cmd} -o ConnectTimeout=${connect_timeout} ${user}@${host} ${origin_file}"
-  auto_passwd_cmd $cmd $pass
+  cmd="${cmd} -o ConnectTimeout=${connect_timeout} ${user}@${host} \"${origin_file}\""
+  auto_passwd_cmd $cmd $pass 
 }
 
 cluster_cmd() {
