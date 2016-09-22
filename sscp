@@ -14,45 +14,60 @@ print_host() {
 	echo -e "\033[0;3;35m -> \033[0;3;35m$host \033[0m"
 }
 
+auto_passwd_cmd() {
+  expect -c "
+    spawn $cmd
+      expect {
+        \"*yes/no*\" {send \"yes\r\"; exp_continue}
+        \"*password:*\" {send \"$pass\r\"; exp_continue}
+      }
+  "
+}
+
 trans_file() {
-  print_host $host
+  method="trans_file"
+  print_host $host ${method}
   cmd="scp"
   if [ ! -z $port ]; then
   	cmd="${cmd} -P ${port}"
   fi
-  cmd="${cmd} -o ConnectTimeout=${connect_timeout} $(realpath $origin_file) ${user}@${host}:$target_file"
-  $cmd
+  cmd="${cmd} -o ConnectTimeout=${connect_timeout} $(realpath $origin_file) ${user}@${host}:${target_file}"
+  auto_passwd_cmd $cmd $pass
 }
 
 trans_folder() {
-  print_host $host
+  method="trans_folder"
+  print_host $host ${method}
   cmd="scp"
   if [ ! -z $port ]; then
   	cmd="${cmd} -P ${port}"
   fi
-  cmd="${cmd} -r -o ConnectTimeout=${connect_timeout} $(realpath $origin_file) ${user}@${host}:$target_file"
-  $cmd
+  cmd="${cmd} -r -o ConnectTimeout=${connect_timeout} $(realpath $origin_file) ${user}@${host}:${target_file}"
+  auto_passwd_cmd $cmd $pass
 }
 
 execute_cmd() {
-  print_host $host
+  method="execute_cmd"
+  print_host $host ${method}
   cmd="ssh"
   if [ ! -z $port ]; then
   	cmd="${cmd} -p ${port}"
   fi
-  cmd="${cmd} ${user}@${host} $origin_file"
-  $cmd
+  cmd="${cmd} -o ConnectTimeout=${connect_timeout} ${user}@${host} ${origin_file}"
+  auto_passwd_cmd $cmd $pass
 }
 
-iterate_cmd() {
+cluster_cmd() {
   for host_union in $(<hosts.conf); do
-  	# Split hosts.conf 
-  	IFS=':' read -a host_array <<< "$host_union"
+    # Check if it is a comments line.
+    [ ${host_union:0:1} = "#" ] && continue
+    # Split hosts.conf 
+  	IFS=':' read -a host_array <<< "${host_union}"
   	user=${host_array[0]}
-	host=${host_array[1]}
-	port=${host_array[2]}
-
-    $1 $user $host $port
+	  host=${host_array[1]}
+	  port=${host_array[2]}
+    pass=${host_array[3]}
+    $1 $user $host $port $pass
   done
 }
 
@@ -64,14 +79,14 @@ fi
 
 # Execute 'sscp' command by the number of arguments
 if [ "$#" = 1 ]; then
-	iterate_cmd execute_cmd
+	cluster_cmd execute_cmd
 elif [ "$#" = 2 ]; then
-	if [ -d $origin_file ]; then
+	if [ -d ${origin_file} ]; then
       #trans_folder
-      iterate_cmd trans_folder
-    elif [ -f $origin_file ]; then
+      cluster_cmd trans_folder
+    elif [ -f ${origin_file} ]; then
       #trans_file
-      iterate_cmd trans_file
+      cluster_cmd trans_file
     else
       echo "sscp: error '$origin_file', file or folder is not exist."
       exit
