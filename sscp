@@ -14,7 +14,7 @@ print_host() {
 	echo -e "\033[0;3;35m -> \033[0;3;35m$host \033[0m"
 }
 
-auto_passwd_cmd() {
+auto_passwd_trans() {
   set timeout -1
   expect -c "
     spawn $cmd
@@ -28,6 +28,18 @@ auto_passwd_cmd() {
   "
 }
 
+auto_passwd_cmd() {
+  set timeout -1
+  expect -c "
+    spawn $cmd
+      expect {
+        \"*yes/no*\" {send \"yes\r\"; exp_continue}
+        \"*password:*\" {send \"$pass\r\"; exp_continue}
+        \"*# \" {send_user \"Job Finished.\r\"; expect eof}
+      }
+  "
+}
+
 trans_file() {
   method="trans_file"
   print_host $host ${method}
@@ -36,7 +48,7 @@ trans_file() {
   	cmd="${cmd} -P ${port}"
   fi
   cmd="${cmd} -o ConnectTimeout=${connect_timeout} $(realpath $origin_file) ${user}@${host}:${target_file}"
-  auto_passwd_cmd $cmd $pass
+  auto_passwd_trans $cmd $pass
 }
 
 trans_folder() {
@@ -47,7 +59,7 @@ trans_folder() {
   	cmd="${cmd} -P ${port}"
   fi
   cmd="${cmd} -r -o ConnectTimeout=${connect_timeout} $(realpath $origin_file) ${user}@${host}:${target_file}"
-  auto_passwd_cmd $cmd $pass
+  auto_passwd_trans $cmd $pass
 }
 
 execute_cmd() {
